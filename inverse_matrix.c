@@ -2,237 +2,274 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 
-#define N 10
-#define MAX_ITER 100
 #define EPSILON 1e-6
+#define MAX_ITER 100
 
-void print_matrix(double A[N][N], int n, FILE *f) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%10.6lf ", A[i][j]);
-            if (f) fprintf(f, "%10.6lf ", A[i][j]);
-        }
-        printf("\n");
-        if (f) fprintf(f, "\n");
-    }
+void intro() {
+    printf("***********************************************************\n");
+    printf("                 DO AN LAP TRINH TINH TOAN                 \n");
+    printf("***********************************************************\n");
+    printf("         SINH VIEN: NGUYEN TIEN DAT & NGUYEN ANH HOA       \n");
+    printf("         HUONG DAN: TS.NGUYEN VAN HIEU                     \n");
+    printf("===========================================================\n");
+    printf("                   CHUONG TRINH THUC HIEN                  \n");
+    printf("===========================================================\n\n");
 }
 
-void identity_matrix(double I[N][N], int n) {
-    memset(I, 0, sizeof(double)*N*N);
+// --- Ma trận ---
+float **createMatrix(int n) {
+    float **matrix = (float **)calloc(n, sizeof(float *));
     for (int i = 0; i < n; i++)
-        I[i][i] = 1.0;
+        matrix[i] = (float *)calloc(n, sizeof(float));
+    return matrix;
 }
 
-void copy_matrix(double src[N][N], double dest[N][N], int n) {
+void freeMatrix(float **matrix, int n) {
+    for (int i = 0; i < n; i++) free(matrix[i]);
+    free(matrix);
+}
+
+void copyMatrix(float **src, float **dest, int n) {
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             dest[i][j] = src[i][j];
 }
 
-// --- Gauss-Jordan ---
-void inverse_gauss_jordan(double A[N][N], double inv[N][N], int n) {
-    double aug[N][2*N];
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++) {
-            aug[i][j] = A[i][j];
-            aug[i][j+n] = (i == j) ? 1.0 : 0.0;
-        }
-
-    for (int i = 0; i < n; i++) {
-        if (aug[i][i] == 0.0) {
-            int swap = -1;
-            for (int j = i+1; j < n; j++)
-                if (aug[j][i] != 0.0) { swap = j; break; }
-            if (swap == -1) {
-                printf("Khong kha nghich (h%d = 0)\n", i);
-                return;
-            }
-            for (int k = 0; k < 2*n; k++) {
-                double temp = aug[i][k];
-                aug[i][k] = aug[swap][k];
-                aug[swap][k] = temp;
-            }
-        }
-
-        double pivot = aug[i][i];
-        for (int j = 0; j < 2*n; j++) aug[i][j] /= pivot;
-        for (int j = 0; j < n; j++) {
-            if (j == i) continue;
-            double factor = aug[j][i];
-            for (int k = 0; k < 2*n; k++)
-                aug[j][k] -= factor * aug[i][k];
-        }
-    }
-
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            inv[i][j] = aug[i][j + n];
-}
-
-// --- Laplace ---
-double determinant(double A[N][N], int n) {
-    if (n == 1) return A[0][0];
-    if (n == 2) return A[0][0]*A[1][1] - A[0][1]*A[1][0];
-    double det = 0.0;
-    double minor[N][N];
-    for (int k = 0; k < n; k++) {
-        int subi = 0;
-        for (int i = 1; i < n; i++) {
-            int subj = 0;
-            for (int j = 0; j < n; j++) {
-                if (j == k) continue;
-                minor[subi][subj++] = A[i][j];
-            }
-            subi++;
-        }
-        det += (k % 2 == 0 ? 1 : -1) * A[0][k] * determinant(minor, n-1);
-    }
-    return det;
-}
-
-void cofactor(double A[N][N], double cof[N][N], int n) {
-    double minor[N][N];
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++) {
-            int subi = 0;
-            for (int row = 0; row < n; row++) {
-                if (row == i) continue;
-                int subj = 0;
-                for (int col = 0; col < n; col++) {
-                    if (col == j) continue;
-                    minor[subi][subj++] = A[row][col];
-                }
-                subi++;
-            }
-            cof[i][j] = pow(-1, i + j) * determinant(minor, n-1);
-        }
-}
-
-void transpose(double A[N][N], double T[N][N], int n) {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            T[i][j] = A[j][i];
-}
-
-void inverse_laplace(double A[N][N], double inv[N][N], int n) {
-    double det = determinant(A, n);
-    if (det == 0) {
-        printf("Khong kha nghich (det = 0)\n");
-        return;
-    }
-    double cof[N][N], adj[N][N];
-    cofactor(A, cof, n);
-    transpose(cof, adj, n);
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            inv[i][j] = adj[i][j] / det;
-}
-
-// --- Newton-Schulz ---
-void multiply(double A[N][N], double B[N][N], double C[N][N], int n) {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++) {
-            C[i][j] = 0;
-            for (int k = 0; k < n; k++)
-                C[i][j] += A[i][k] * B[k][j];
-        }
-}
-
-void subtract(double A[N][N], double B[N][N], double C[N][N], int n) {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            C[i][j] = A[i][j] - B[i][j];
-}
-
-void scalar_multiply(double A[N][N], double k, double B[N][N], int n) {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            B[i][j] = A[i][j] * k;
-}
-
-void inverse_newton_schulz(double A[N][N], double inv[N][N], int n) {
-    double normA = 0;
-    for (int i = 0; i < n; i++) {
-        double rowsum = 0;
-        for (int j = 0; j < n; j++)
-            rowsum += fabs(A[i][j]);
-        if (rowsum > normA)
-            normA = rowsum;
-    }
-
-    double X[N][N], I[N][N], AX[N][N], R[N][N], temp[N][N];
-    identity_matrix(I, n);
-    scalar_multiply(A, 1.0 / normA / normA, X, n);
-
-    for (int iter = 0; iter < MAX_ITER; iter++) {
-        multiply(A, X, AX, n);
-        subtract(I, AX, R, n);
-        multiply(R, X, temp, n);
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++)
-                X[i][j] += temp[i][j];
-
-        double max_diff = 0;
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++)
-                if (fabs(R[i][j]) > max_diff)
-                    max_diff = fabs(R[i][j]);
-        if (max_diff < EPSILON)
-            break;
-    }
-
-    copy_matrix(X, inv, n);
-}
-
-// --- MAIN ---
-int main() {
-    int n, method;
-    double A[N][N], result[N][N];
-
-    printf("Nhap cap ma tran vuong n (toi da %d): ", N);
-    scanf("%d", &n);
+void inputMatrix(float **a, int n) {
     printf("Nhap ma tran %dx%d:\n", n, n);
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
-            scanf("%lf", &A[i][j]);
+            scanf("%f", &a[i][j]);
+}
 
-    printf("\nChon phuong phap tinh nghich dao:\n");
-    printf("1. Gauss-Jordan\n2. Laplace\n3. Newton-Schulz\n");
-    printf("Lua chon cua ban: ");
-    scanf("%d", &method);
+void printMatrix(float **a, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            printf("%8.3f ", a[i][j]);
+        printf("\n");
+    }
+}
 
-    FILE *f = fopen("inverse_matrix.txt", "w");
+// --- Phương pháp Gauss-Jordan ---
+int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
+    float **tmp = createMatrix(n);
+    copyMatrix(a, tmp, n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            inv[i][j] = (i == j) ? 1.0f : 0.0f;
+
+    for (int i = 0; i < n; i++) {
+        if (fabs(tmp[i][i]) < EPSILON) {
+            printf("Khong the nghich dao (pivot = 0)\n");
+            freeMatrix(tmp, n);
+            return 0;
+        }
+
+        float pivot = tmp[i][i];
+        for (int j = 0; j < n; j++) {
+            tmp[i][j] /= pivot;
+            inv[i][j] /= pivot;
+        }
+
+        for (int k = 0; k < n; k++) {
+            if (k == i) continue;
+            float factor = tmp[k][i];
+            for (int j = 0; j < n; j++) {
+                tmp[k][j] -= factor * tmp[i][j];
+                inv[k][j] -= factor * inv[i][j];
+            }
+        }
+
+        if (printSteps) {
+            printf("Buoc %d:\n", i + 1);
+            printMatrix(inv, n);
+        }
+    }
+
+    freeMatrix(tmp, n);
+    return 1;
+}
+
+// --- Phương pháp Laplace ---
+float determinant(float **a, int n) {
+    if (n == 1) return a[0][0];
+    if (n == 2) return a[0][0]*a[1][1] - a[0][1]*a[1][0];
+
+    float det = 0;
+    float **sub = createMatrix(n - 1);
+
+    for (int k = 0; k < n; k++) {
+        for (int i = 1; i < n; i++) {
+            int col = 0;
+            for (int j = 0; j < n; j++)
+                if (j != k)
+                    sub[i-1][col++] = a[i][j];
+        }
+        det += (k % 2 == 0 ? 1 : -1) * a[0][k] * determinant(sub, n - 1);
+    }
+
+    freeMatrix(sub, n - 1);
+    return det;
+}
+
+void adjugate(float **a, float **adj, int n) {
+    float **sub = createMatrix(n - 1);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            int row = 0, col;
+            for (int ii = 0; ii < n; ii++) {
+                if (ii == i) continue;
+                col = 0;
+                for (int jj = 0; jj < n; jj++) {
+                    if (jj == j) continue;
+                    sub[row][col++] = a[ii][jj];
+                }
+                row++;
+            }
+            adj[j][i] = (((i + j) % 2 == 0) ? 1 : -1) * determinant(sub, n - 1);
+        }
+    freeMatrix(sub, n - 1);
+}
+
+int inverseLaplace(float **a, float **inv, int n) {
+    float det = determinant(a, n);
+    if (fabs(det) < EPSILON) {
+        printf("Khong the nghich dao (dinh thuc = 0)\n");
+        return 0;
+    }
+    float **adj = createMatrix(n);
+    adjugate(a, adj, n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            inv[i][j] = adj[i][j] / det;
+    freeMatrix(adj, n);
+    return 1;
+}
+
+// --- Phương pháp Newton-Schulz ---
+int inverseNewtonSchulz(float **a, float **inv, int n) {
+    float **X = createMatrix(n);
+    float **I = createMatrix(n);
+    float **AX = createMatrix(n);
+    float **T = createMatrix(n);
+
+    // X0 = A^T / ||A||^2
+    float norm = 0;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            norm += a[i][j] * a[i][j];
+
+    float scale = 1.0f / norm;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            X[i][j] = a[j][i] * scale;
+
+    for (int i = 0; i < n; i++) I[i][i] = 1.0f;
+
+    for (int iter = 0; iter < MAX_ITER; iter++) {
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+                AX[i][j] = 0;
+                for (int k = 0; k < n; k++) AX[i][j] += a[i][k] * X[k][j];
+                T[i][j] = I[i][j] - AX[i][j];
+            }
+
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+                float sum = 0;
+                for (int k = 0; k < n; k++) sum += X[i][k] * T[k][j];
+                inv[i][j] = X[i][j] + sum;
+            }
+
+        copyMatrix(inv, X, n);
+    }
+
+    freeMatrix(X, n); freeMatrix(I, n);
+    freeMatrix(AX, n); freeMatrix(T, n);
+    return 1;
+}
+
+// --- Ghi file ---
+void saveToFile(float **a, int n, const char *filename, const char *methodName) {
+    FILE *f = fopen(filename, "a");  
     if (!f) {
-        printf("Khong the mo tep de ghi ket qua.\n");
+        printf("Khong the mo file de ghi.\n");
+        return;
+    }
+
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    fprintf(f, "\nThoi gian: %02d-%02d-%04d %02d:%02d:%02d\n",
+            t->tm_mday, t->tm_mon + 1, t->tm_year + 1900,
+            t->tm_hour, t->tm_min, t->tm_sec);
+    fprintf(f, "Phuong phap: %s\n", methodName);
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            fprintf(f, "%8.3f ", a[i][j]);
+        fprintf(f, "\n");
+    }
+    fprintf(f, "\n");
+
+    fclose(f);
+    printf("Da luu vao file '%s'\n", filename);  
+}
+
+
+// --- Main ---
+int main() {
+    int n, method, printSteps, save, again;
+    char methodName[50];
+    intro();
+
+    FILE *fout = fopen("inverse_matrix.txt", "w"); // xóa nội dung cũ
+    if (!fout) {
+        printf("Khong the mo file.\n");
         return 1;
     }
+fclose(fout);
+    do {
+        do {
+            printf("Nhap cap ma tran (n > 0): ");
+            scanf("%d", &n);
+        } while (n <= 0);
 
-    switch (method) {
-        case 1:
-            printf("\n--- Nghich dao (Gauss-Jordan) ---\n");
-            fprintf(f, "--- Nghich dao (Gauss-Jordan) ---\n");
-            inverse_gauss_jordan(A, result, n);
-            break;
-        case 2:
-            printf("\n--- Nghich dao (Laplace) ---\n");
-            fprintf(f, "--- Nghich dao (Laplace) ---\n");
-            inverse_laplace(A, result, n);
-            break;
-        case 3:
-            printf("\n--- Nghich dao (Newton-Schulz) ---\n");
-            fprintf(f, "--- Nghich dao (Newton-Schulz) ---\n");
-            inverse_newton_schulz(A, result, n);
-            break;
-        default:
-            printf("Lua chon khong hop le.\n");
-            fclose(f);
-            return 1;
-    }
+        float **A = createMatrix(n);
+        float **inv = createMatrix(n);
+        inputMatrix(A, n);
 
-    print_matrix(result, n, f);
-    fclose(f);
-    printf("\nDa luu ket qua vao tep inverse_matrix.txt\n");
+        do {
+            printf("\nChon phuong phap:\n1. Gauss-Jordan\n2. Laplace\n3. Newton-Schulz\nLua chon (1-3): ");
+            scanf("%d", &method);
+        } while (method < 1 || method > 3);
 
+        printf("In ket qua tung buoc? (0: Khong, 1: Co): ");
+        scanf("%d", &printSteps);
+
+        int success = 0;
+        switch (method) {
+            case 1: success = inverseGaussJordan(A, inv, n, printSteps); strcpy(methodName, "Gauss-Jordan"); break;
+            case 2: success = inverseLaplace(A, inv, n); strcpy(methodName, "Laplace"); break;
+            case 3: success = inverseNewtonSchulz(A, inv, n); strcpy(methodName, "Newton-Schulz"); break;
+        }
+
+        if (success) {
+            printf("Ma tran nghich dao:\n");
+            printMatrix(inv, n);
+            printf("Luu vao tep? (0: Khong, 1: Co): ");
+            scanf("%d", &save);
+            if (save) saveToFile(inv, n, "inverse_matrix.txt", methodName);
+        }
+
+        freeMatrix(A, n);
+        freeMatrix(inv, n);
+
+        printf("Tiep tuc? (0: Dung, 1: Tiep tuc): ");
+        scanf("%d", &again);
+    } while (again);
+
+    fclose(fout);
     return 0;
 }
