@@ -18,7 +18,6 @@ void intro() {
     printf("===========================================================\n\n");
 }
 
-// --- Ma trận ---
 float **createMatrix(int n) {
     float **matrix = (float **)calloc(n, sizeof(float *));
     for (int i = 0; i < n; i++)
@@ -52,7 +51,6 @@ void printMatrix(float **a, int n) {
     }
 }
 
-// --- Phương pháp Gauss-Jordan ---
 int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
     float **tmp = createMatrix(n);
     copyMatrix(a, tmp, n);
@@ -92,8 +90,7 @@ int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
     return 1;
 }
 
-// --- Phương pháp Laplace ---
-float determinant(float **a, int n) {
+float determinant(float **a, int n, int printSteps) {
     if (n == 1) return a[0][0];
     if (n == 2) return a[0][0]*a[1][1] - a[0][1]*a[1][0];
 
@@ -107,14 +104,21 @@ float determinant(float **a, int n) {
                 if (j != k)
                     sub[i-1][col++] = a[i][j];
         }
-        det += (k % 2 == 0 ? 1 : -1) * a[0][k] * determinant(sub, n - 1);
+        float cofactor = ((k % 2 == 0) ? 1 : -1) * a[0][k] * determinant(sub, n - 1, printSteps);
+        det += cofactor;
+
+        if (printSteps) {
+            printf("Minor tai cot %d:\n", k);
+            printMatrix(sub, n - 1);
+            printf("Cofactor: %.3f\n", cofactor);
+        }
     }
 
     freeMatrix(sub, n - 1);
     return det;
 }
 
-void adjugate(float **a, float **adj, int n) {
+void adjugate(float **a, float **adj, int n, int printSteps) {
     float **sub = createMatrix(n - 1);
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++) {
@@ -128,19 +132,33 @@ void adjugate(float **a, float **adj, int n) {
                 }
                 row++;
             }
-            adj[j][i] = (((i + j) % 2 == 0) ? 1 : -1) * determinant(sub, n - 1);
+            float cof = (((i + j) % 2 == 0) ? 1 : -1) * determinant(sub, n - 1, printSteps);
+            adj[j][i] = cof;
+
+            if (printSteps) {
+                printf("Minor (%d,%d):\n", i, j);
+                printMatrix(sub, n - 1);
+                printf("Cofactor: %.3f\n\n", cof);
+            }
         }
     freeMatrix(sub, n - 1);
 }
 
-int inverseLaplace(float **a, float **inv, int n) {
-    float det = determinant(a, n);
+int inverseLaplace(float **a, float **inv, int n, int printSteps) {
+    float det = determinant(a, n, printSteps);
     if (fabs(det) < EPSILON) {
         printf("Khong the nghich dao (dinh thuc = 0)\n");
         return 0;
     }
     float **adj = createMatrix(n);
-    adjugate(a, adj, n);
+    adjugate(a, adj, n, printSteps);
+
+    if (printSteps) {
+        printf("Ma tran phu hop (adjugate):\n");
+        printMatrix(adj, n);
+        printf("Dinh thuc: %.6f\n", det);
+    }
+
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             inv[i][j] = adj[i][j] / det;
@@ -148,14 +166,12 @@ int inverseLaplace(float **a, float **inv, int n) {
     return 1;
 }
 
-// --- Phương pháp Newton-Schulz ---
-int inverseNewtonSchulz(float **a, float **inv, int n) {
+int inverseNewtonSchulz(float **a, float **inv, int n, int printSteps) {
     float **X = createMatrix(n);
     float **I = createMatrix(n);
     float **AX = createMatrix(n);
     float **T = createMatrix(n);
 
-    // X0 = A^T / ||A||^2
     float norm = 0;
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
@@ -183,6 +199,11 @@ int inverseNewtonSchulz(float **a, float **inv, int n) {
                 inv[i][j] = X[i][j] + sum;
             }
 
+        if (printSteps) {
+            printf("Lan lap %d:\n", iter + 1);
+            printMatrix(inv, n);
+        }
+
         copyMatrix(inv, X, n);
     }
 
@@ -191,9 +212,8 @@ int inverseNewtonSchulz(float **a, float **inv, int n) {
     return 1;
 }
 
-// --- Ghi file ---
 void saveToFile(float **a, int n, const char *filename, const char *methodName) {
-    FILE *f = fopen(filename, "a");  
+    FILE *f = fopen(filename, "a");
     if (!f) {
         printf("Khong the mo file de ghi.\n");
         return;
@@ -214,22 +234,21 @@ void saveToFile(float **a, int n, const char *filename, const char *methodName) 
     fprintf(f, "\n");
 
     fclose(f);
-    printf("Da luu vao file '%s'\n", filename);  
+    printf("Da luu vao file '%s'\n", filename);
 }
 
-
-// --- Main ---
 int main() {
     int n, method, printSteps, save, again;
     char methodName[50];
     intro();
 
-    FILE *fout = fopen("inverse_matrix.txt", "w"); // xóa nội dung cũ
+    FILE *fout = fopen("inverse_matrix.txt", "w");
     if (!fout) {
         printf("Khong the mo file.\n");
         return 1;
     }
-fclose(fout);
+    fclose(fout);
+
     do {
         do {
             printf("Nhap cap ma tran (n > 0): ");
@@ -251,8 +270,8 @@ fclose(fout);
         int success = 0;
         switch (method) {
             case 1: success = inverseGaussJordan(A, inv, n, printSteps); strcpy(methodName, "Gauss-Jordan"); break;
-            case 2: success = inverseLaplace(A, inv, n); strcpy(methodName, "Laplace"); break;
-            case 3: success = inverseNewtonSchulz(A, inv, n); strcpy(methodName, "Newton-Schulz"); break;
+            case 2: success = inverseLaplace(A, inv, n, printSteps); strcpy(methodName, "Laplace"); break;
+            case 3: success = inverseNewtonSchulz(A, inv, n, printSteps); strcpy(methodName, "Newton-Schulz"); break;
         }
 
         if (success) {
@@ -270,6 +289,5 @@ fclose(fout);
         scanf("%d", &again);
     } while (again);
 
-    fclose(fout);
     return 0;
 }
