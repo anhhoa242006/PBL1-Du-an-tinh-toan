@@ -43,13 +43,40 @@ void inputMatrix(float **a, int n) {
             scanf("%f", &a[i][j]);
 }
 
-void printMatrix(float **a, int n) {
+void printMatrix(float **matrix, int n) {
     for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++)
-            printf("%8.3f ", a[i][j]);
+        for (int j = 0; j < n; j++) {
+            if (fabs(matrix[i][j]) < EPSILON)
+                printf("%8.3f ", 0.0);
+            else
+                printf("%8.3f ", matrix[i][j]);
+        }
         printf("\n");
     }
 }
+
+void printAugmentedMatrix(float **a, float **inv, int n) {
+    for (int i = 0; i < n; i++) {
+        // In ma trận A
+        for (int j = 0; j < n; j++) {
+            if (fabs(a[i][j]) < EPSILON)
+                printf("%8.3f ", 0.0);
+            else
+                printf("%8.3f ", a[i][j]);
+        }
+        printf(" | ");  // Dấu phân cách giữa A và I hoặc inv
+
+        // In ma trận I hoặc ma trận nghịch đảo
+        for (int j = 0; j < n; j++) {
+            if (fabs(inv[i][j]) < EPSILON)
+                printf("%8.3f ", 0.0);
+            else
+                printf("%8.3f ", inv[i][j]);
+        }
+        printf("\n");
+    }
+}
+
 
 int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
     float **tmp = createMatrix(n);
@@ -81,9 +108,11 @@ int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
         }
 
         if (printSteps) {
-            printf("Buoc %d:\n", i + 1);
-            printMatrix(inv, n);
-        }
+    printf("Trang thai ban dau [A | I]:\n");
+    printAugmentedMatrix(a, inv, n);
+    printf("\n");
+}
+
     }
 
     freeMatrix(tmp, n);
@@ -228,7 +257,7 @@ void saveToFile(float **a, int n, const char *filename, const char *methodName) 
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++)
-            fprintf(f, "%8.3f ", a[i][j]);
+            fprintf(f, "%8.3f ", fabs(a[i][j]) < EPSILON ? 0.0 : a[i][j]);
         fprintf(f, "\n");
     }
     fprintf(f, "\n");
@@ -275,7 +304,7 @@ int main() {
         }
 
         if (success) {
-            printf("Ma tran nghich dao:\n");
+            printf(" Vay ma tran nghich dao:\n");
             printMatrix(inv, n);
             printf("Luu vao tep? (0: Khong, 1: Co): ");
             scanf("%d", &save);
