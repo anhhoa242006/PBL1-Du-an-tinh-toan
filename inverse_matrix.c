@@ -8,14 +8,17 @@
 #define MAX_ITER 100
 
 void intro() {
-    printf("***********************************************************\n");
-    printf("                 DO AN LAP TRINH TINH TOAN                 \n");
-    printf("***********************************************************\n");
-    printf("         SINH VIEN: NGUYEN TIEN DAT & NGUYEN ANH HOA       \n");
-    printf("         HUONG DAN: TS.NGUYEN VAN HIEU                     \n");
-    printf("===========================================================\n");
-    printf("                   CHUONG TRINH THUC HIEN                  \n");
-    printf("===========================================================\n\n");
+    printf("|==========================================================|\n");
+    printf("|                 DO AN LAP TRINH TINH TOAN                |\n");
+    printf("|                                                          |\n");
+    printf("|                  TINH MA TRAN NGHICH DAO                 |\n");
+    printf("|__________________________________________________________|\n");
+    printf("|         SINH VIEN: NGUYEN TIEN DAT & NGUYEN ANH HOA      |\n");
+    printf("|                                                          |\n");
+    printf("|               HUONG DAN: TS.NGUYEN VAN HIEU              | \n");
+    printf("|==========================================================|\n");
+    printf("|                   CHUONG TRINH THUC HIEN                 | \n");
+    printf("|==========================================================|\n\n");
 }
 
 float **createMatrix(int n) {
@@ -280,7 +283,7 @@ int main() {
 
     do {
         do {
-            printf("Nhap cap ma tran (n > 0): ");
+            printf("Nhap hang ma tran (n > 0): ");
             scanf("%d", &n);
         } while (n <= 0);
 
