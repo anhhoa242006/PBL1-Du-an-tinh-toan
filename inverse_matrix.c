@@ -20,8 +20,17 @@ void intro() {
 
 float **createMatrix(int n) {
     float **matrix = (float **)calloc(n, sizeof(float *));
-    for (int i = 0; i < n; i++)
+    if (!matrix) {
+        printf("Loi cap phat bo nho cho ma tran.\n");
+        exit(1);
+    }
+    for (int i = 0; i < n; i++) {
         matrix[i] = (float *)calloc(n, sizeof(float));
+        if (!matrix[i]) {
+            printf("Loi cap phat bo nho cho hang %d.\n", i);
+            exit(1);
+        }
+    }
     return matrix;
 }
 
@@ -39,8 +48,12 @@ void copyMatrix(float **src, float **dest, int n) {
 void inputMatrix(float **a, int n) {
     printf("Nhap ma tran %dx%d:\n", n, n);
     for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            scanf("%f", &a[i][j]);
+        for (int j = 0; j < n; j++) {
+            while (scanf("%f", &a[i][j]) != 1) {
+                printf("Gia tri khong hop le, vui long nhap lai: ");
+                while (getchar() != '\n'); // Clear input buffer
+            }
+        }
 }
 
 void printMatrix(float **matrix, int n) {
@@ -59,12 +72,9 @@ void printAugmentedMatrix(float **a, float **inv, int n) {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++)
             printf("%8.3f ", fabs(a[i][j]) < EPSILON ? 0.0 : a[i][j]);
-
         printf(" | ");
-
         for (int j = 0; j < n; j++)
             printf("%8.3f ", fabs(inv[i][j]) < EPSILON ? 0.0 : inv[i][j]);
-
         printf("\n");
     }
 }
@@ -78,21 +88,23 @@ int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
             inv[i][j] = (i == j) ? 1.0f : 0.0f;
 
     for (int i = 0; i < n; i++) {
-        if (fabs(tmp[i][i]) < EPSILON) {
-            int found = 0;
-            for (int k = i + 1; k < n; k++) {
-                if (fabs(tmp[k][i]) > EPSILON) {
-                    float *t = tmp[i]; tmp[i] = tmp[k]; tmp[k] = t;
-                    t = inv[i]; inv[i] = inv[k]; inv[k] = t;
-                    found = 1;
-                    break;
-                }
+        // Partial pivoting: find row with largest pivot
+        int maxRow = i;
+        float maxVal = fabs(tmp[i][i]);
+        for (int k = i + 1; k < n; k++) {
+            if (fabs(tmp[k][i]) > maxVal) {
+                maxVal = fabs(tmp[k][i]);
+                maxRow = k;
             }
-            if (!found) {
-                printf("Khong the nghich dao (cot %d toan 0).\n", i);
-                freeMatrix(tmp, n);
-                return 0;
-            }
+        }
+        if (fabs(maxVal) < EPSILON) {
+            printf("Khong the nghich dao (cot %d toan 0).\n", i);
+            freeMatrix(tmp, n);
+            return 0;
+        }
+        if (maxRow != i) {
+            float *t = tmp[i]; tmp[i] = tmp[maxRow]; tmp[maxRow] = t;
+            t = inv[i]; inv[i] = inv[maxRow]; inv[maxRow] = t;
         }
 
         float pivot = tmp[i][i];
@@ -123,12 +135,13 @@ int inverseGaussJordan(float **a, float **inv, int n, int printSteps) {
 
 float determinant(float **a, int n, int printSteps) {
     if (n == 1) return a[0][0];
-    if (n == 2) return a[0][0]*a[1][1] - a[0][1]*a[1][0];
+    if (n == 2) return a[0][0] * a[1][1] - a[0][1] * a[1][0];
 
     float det = 0;
     float **sub = createMatrix(n - 1);
 
     for (int k = 0; k < n; k++) {
+        if (fabs(a[0][k]) < EPSILON) continue; // Skip near-zero elements
         for (int i = 1; i < n; i++) {
             int col = 0;
             for (int j = 0; j < n; j++)
@@ -178,15 +191,18 @@ void adjugate(float **a, float **adj, int n, int printSteps) {
 }
 
 int inverseLaplace(float **a, float **inv, int n, int printSteps) {
-    float **adj = createMatrix(n);
     float det = determinant(a, n, printSteps);
-    if (fabs(det) < EPSILON) return 0;
+    if (fabs(det) < EPSILON) {
+        printf("Ma tran khong kha nghich (dinh thuc gan bang 0).\n");
+        return 0;
+    }
 
+    float **adj = createMatrix(n);
     adjugate(a, adj, n, printSteps);
 
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
-            inv[i][j] = adj[j][i] / det;  // Chuyển vị và chia định thức
+            inv[i][j] = adj[j][i] / det;
 
     freeMatrix(adj, n);
     return 1;
@@ -201,26 +217,33 @@ int inverseNewtonSchulz(float **a, float **inv, int n, int printSteps) {
 
     for (int i = 0; i < n; i++) I[i][i] = 1.0f;
 
-    // Khởi tạo X0 = A^T / ||A||^2
+    // Compute Frobenius norm for initial guess
     float norm = 0.0f;
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             norm += a[i][j] * a[i][j];
     norm = sqrt(norm);
+    float scale = (norm != 0) ? 1.0f / (norm * norm) : 1.0f;
 
+    // Initial guess: X0 = A^T / ||A||_F^2
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
-            X[i][j] = a[j][i] / (norm * norm); // X0 = A^T / ||A||^2
+            X[i][j] = a[j][i] * scale;
 
+    int converged = 0;
     for (int iter = 0; iter < MAX_ITER; iter++) {
-        // R = 2I - A * X
+        // Compute AX
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++) {
                 AX[i][j] = 0;
                 for (int k = 0; k < n; k++)
                     AX[i][j] += a[i][k] * X[k][j];
-                R[i][j] = 2.0f * I[i][j] - AX[i][j];
             }
+
+        // R = 2I - AX
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                R[i][j] = 2.0f * I[i][j] - AX[i][j];
 
         // newX = X * R
         for (int i = 0; i < n; i++)
@@ -230,21 +253,35 @@ int inverseNewtonSchulz(float **a, float **inv, int n, int printSteps) {
                     newX[i][j] += X[i][k] * R[k][j];
             }
 
-        if (printSteps) {
-            printf("Lan lap %d:\n", iter + 1);
-            printMatrix(newX, n);
-        }
-
-        // Kiểm tra hội tụ (tùy chọn)
-        float maxDiff = 0;
+        // Check convergence: ||I - A*X||_F
+        float error = 0;
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++) {
-                float diff = fabs(newX[i][j] - X[i][j]);
-                if (diff > maxDiff) maxDiff = diff;
+                float val = (i == j) ? 1.0f : 0.0f;
+                val -= AX[i][j];
+                error += val * val;
             }
-        if (maxDiff < EPSILON) break;
+        error = sqrt(error);
+
+        if (printSteps) {
+            printf("Lan lap %d (error: %.6f):\n", iter + 1, error);
+            printMatrix(newX, n);
+        }
+        
+        if (error < EPSILON) {
+            converged = 1;
+            break;
+        }
 
         copyMatrix(newX, X, n);
+    }
+
+    if (!converged) {
+        printf("Phuong phap Newton-Schulz khong hoi tu sau %d lan lap.\n", MAX_ITER);
+        freeMatrix(X, n); freeMatrix(I, n);
+        freeMatrix(AX, n); freeMatrix(R, n);
+        freeMatrix(newX, n);
+        return 0;
     }
 
     copyMatrix(X, inv, n);
@@ -254,7 +291,6 @@ int inverseNewtonSchulz(float **a, float **inv, int n, int printSteps) {
     freeMatrix(newX, n);
     return 1;
 }
-
 
 void saveToFile(float **a, int n, const char *filename, const char *methodName) {
     FILE *f = fopen(filename, "a");
@@ -296,7 +332,10 @@ int main() {
     do {
         do {
             printf("Nhap cap ma tran (n > 0): ");
-            scanf("%d", &n);
+            while (scanf("%d", &n) != 1 || n <= 0) {
+                printf("Cap ma tran khong hop le, vui long nhap lai: ");
+                while (getchar() != '\n');
+            }
         } while (n <= 0);
 
         float **A = createMatrix(n);
@@ -305,11 +344,17 @@ int main() {
 
         do {
             printf("\nChon phuong phap tinh nghich dao:\n1. Gauss-Jordan\n2. Laplace\n3. Newton-Schulz\nLua chon cua ban (1-3): ");
-            scanf("%d", &method);
+            while (scanf("%d", &method) != 1 || method < 1 || method > 3) {
+                printf("Lua chon khong hop le, vui long nhap lai: ");
+                while (getchar() != '\n');
+            }
         } while (method < 1 || method > 3);
 
         printf("Hien thi tung buoc tinh toan? (0: Khong, 1: Co): ");
-        scanf("%d", &printSteps);
+        while (scanf("%d", &printSteps) != 1 || (printSteps != 0 && printSteps != 1)) {
+            printf("Lua chon khong hop le, vui long nhap lai: ");
+            while (getchar() != '\n');
+        }
 
         int success = 0;
         switch (method) {
@@ -322,7 +367,10 @@ int main() {
             printf("Ma tran nghich dao la:\n");
             printMatrix(inv, n);
             printf("Ban co muon luu ket qua vao tep? (0: Khong, 1: Co): ");
-            scanf("%d", &save);
+            while (scanf("%d", &save) != 1 || (save != 0 && save != 1)) {
+                printf("Lua chon khong hop le, vui long nhap lai: ");
+                while (getchar() != '\n');
+            }
             if (save) saveToFile(inv, n, "inverse_matrix.txt", methodName);
         }
 
@@ -330,7 +378,10 @@ int main() {
         freeMatrix(inv, n);
 
         printf("Ban co muon tiep tuc chuong trinh? (0: Dung, 1: Tiep tuc): ");
-        scanf("%d", &again);
+        while (scanf("%d", &again) != 1 || (again != 0 && again != 1)) {
+            printf("Lua chon khong hop le, vui long nhap lai: ");
+            while (getchar() != '\n');
+        }
     } while (again);
 
     printf("\nCam on ban da su dung chuong trinh.\n");
