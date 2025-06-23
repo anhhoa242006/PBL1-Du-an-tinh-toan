@@ -25,7 +25,7 @@ void intro() {
     printf("%s|               HUONG DAN: TS.NGUYEN VAN HIEU              | \n", COLOR_BRIGHT_YELLOW);
     printf("%s|==========================================================|\n", COLOR_BRIGHT_GREEN);
     printf("%s|                   CHUONG TRINH THUC HIEN                 | \n", COLOR_BRIGHT_RED);
-    printf("%s|==========================================================|\n\n%s", COLOR_BRIGHT_BLUE, COLOR_RESET);
+    printf("%s|==========================================================|\n%s", COLOR_BRIGHT_BLUE, COLOR_RESET);
 }
 
 void print_matrix(double **matrix, int n, const char *name) {
@@ -43,7 +43,7 @@ void print_augmented_matrix(double **matrix, int n, const char *name) {
     printf("%s%s:\n", COLOR_BRIGHT_GREEN, name);
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < 2*n; j++) {
-            if (j == n) printf("| ");
+            if (j == n) printf(" | ");
             printf("%8.4f ", matrix[i][j]);
         }
         printf("\n");
@@ -80,7 +80,7 @@ double determinant(double **matrix, int n) {
 
 double **input_matrix(int *n) {
     while (1) {
-        printf("%sNhap hang cua ma tran (1~20): %s", COLOR_BRIGHT_BLUE, COLOR_RESET);
+        printf("%s\nNhap hang cua ma tran (1~20): %s", COLOR_BRIGHT_BLUE, COLOR_RESET);
         if (scanf("%d", n) != 1 || *n < 1 || *n > MAX_SIZE) {
             printf("%sHang ma tran phai tu 1 den 20!\n%s", COLOR_BRIGHT_RED, COLOR_RESET);
             while (getchar() != '\n');
